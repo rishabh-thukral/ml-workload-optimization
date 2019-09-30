@@ -1,15 +1,69 @@
 \section{Collaborative ML Workload Optimizations} \label{sec-ml-workloads}
-In this section, we provide an overview of our system.
-First, we describe how we transform each user workload into a Directed Acyclic Graph (DAG) and how do we combine and store all the DAGs inside the Experiment Graph.
-Then, we present the architecture and optimization workflow.
-Finally, we show our optimizations benefits the use case we introduced in Section \ref{sec-background}.
+In this section, we provide an overview of of our collaborative ML workload optimization system.
+Figure \ref{system-workflow} shows the high-level architecture of our system.
+In a typical collaborative environment, users fetch datasets from a central server, perform their analysis on their local machine, and optionally store their results back in the central server.
+Our system also comprises of a client and server.
+The client is responsible for parsing user scripts into workload DAGs.
+The server receives the workload DAGs and returns an optimal execution DAG.
+Finally, the client executes the optimal execution DAG and prompts the materializer component to update the Experiment Graph.
+%The client supports both python scripts and interactive Jupyter notebooks.
+%The client is also responsible for executing a given workload.
+%The Experiment Graph resides on the server side, which enables workload optimization through materialization and reuse of ML artifacts.
+%After the optimization, the client receives the optimized program and executes it locally.
+This architecture enables us to integrate to existing collaborative environment without requiring any changes to the current workflow of the collaborative environments.
+In the rest of this section, we first describe the process of parsing and executing workloads.
+Then, we describe the process of optimizing workloads and materializing workloads into the Experiment Graph.
+Finally, we address the integration process and the impact of our system on the use case in Section \ref{subsec-motivational-example}.
 
-\subsection{Experiment Graph Construction}\label{sub-graph-construction}
+\begin{figure}
+\centering
+\includegraphics[width=0.7\columnwidth]{../images/system-workflow}
+\caption{System overview of the collaborative workload optimizer}
+\label{system-workflow}
+\end{figure}
+
+\subsection{Workload Parsing and Execution}
+\textbf{ML Script Parsing.}
+Instead of designing a new DSL, we extend the existing Pandas and scikit-learn \cite{sklearn_api} python packages that are frequently used for data analysis and machine learning workloads.
+Listing \ref{listing-experiment-graph} shows an example of a workload script.
+With only a slight modification of the import commands, we are able to load our system's modules.
+As a result, we support both python scripts and interactive Jupyter notebooks.
+Listing \ref{listing-experiment-graph} shows an example of a script.
+\begin{lstlisting}[language=Python, caption=Example script,captionpos=b,label = {listing-experiment-graph}]
+import custom_pandas as pd
+
+from custom_sklearn import svm
+from custom_sklearn.feature_selection import SelectKBest
+from custom_sklearn.feature_extraction.text import CountVectorizer
+
+train = pd.read_csv('../input/train.csv') 
+print train.columns # [ad_desc,ts,u_id,price,y]
+vectorizer = CountVectorizer()
+count_vectorized = vectorizer.fit_transform(train['ad_desc'])
+selector =  SelectKBest(k=2)
+top_features = selector.fit_transform(
+                                  train[['ts','u_id','price']],  
+                                  train['y'])
+top_features # print the content of the data frame			     
+X = pd.concat([count_vectorized,top_features], axis = 1)
+model = svm.SVC().fit(X, train['y'])
+model.get() # terminal vertex
+\end{lstlisting}
+
 \textbf{Workload DAG.}
 A machine learning workload can be represented using a directed acyclic graph (DAG).
-In the DAG, vertices represent the artifacts, i.e., raw or preprocessed data (represented by data frame objects) and machine learning models resulting from feature engineering and model training operations and edges represent the operations in the workload.
+In our DAG representation, vertices represent the artifacts, i.e., raw or preprocessed data (represented by data frame objects) and machine learning models resulting from feature engineering and model training operations and edges represent the operations in the workload.
 Each workload DAG has one or more initial vertices representing the raw datasets which are defined as part of the task definition in a collaborative platform.
-We refer to the initial vertices as the roots.
+We refer to the initial vertices as the sources.
+The parser component, step 1 in Figure \ref{system-workflow}, reads the user script and generates the workload DAG.
+Figure \ref{fig-experiment-graph}a shows an example DAG constructed from the code in Listing \ref{listing-experiment-graph}.
+\begin{figure}
+\centering
+\includegraphics[width=0.8\linewidth]{../images/tikz-standalone/example-graph}
+\caption{Experiment graph constructed from the Listing \ref{listing-experiment-graph} (a) and the hash of the operations in the scripts (b)}
+\label{fig-experiment-graph}
+\end{figure}
+Table \ref{fig-experiment-graph}b shows both the label of every edge operation, i.e., time, and the hash of the operations and their hyperparameters.
 
 \textbf{Experiment Graph. }
 For every task, the collection of all the DAGs of the previously executed machine learning workloads forms a rooted graph (with potentially multiple root vertices) which we refer to as the \textit{experiment graph}.
@@ -40,61 +94,9 @@ Intuitively, the hash of a root vertex is its unique identifier (location on dis
 After a machine learning workload is executed, we update the experiment graph by adding the new artifacts and operations.
 If any of the artifacts already exist in the graph, their frequency is updated.
 
-\textbf{Workload DAG generation.}
-Instead of designing a new DSL, we extend the existing Pandas and scikit-learn \cite{sklearn_api} python packages that are frequently used for data analysis and machine learning workloads.
-Listing \ref{listing-experiment-graph} shows an example of a workload script.
-With only a slight modification of the import commands, we are able to load our system's modules.
-A parser component reads the user code and instead of executing it line-by-line, it creates the edges and vertices of the workload DAG.
-The actual execution is invoked with \textit{.get()} command of a vertex, which we refer to as the \textit{terminal vertex} (Line 18, Listing \ref{listing-experiment-graph}).
-Figure \ref{fig-experiment-graph}a shows an example graph constructed from the code in Listing  Listing \ref{listing-experiment-graph}.
-\begin{figure}
-\begin{subfigure}[b]{0.4\linewidth}
-\centering
-\includegraphics[width=0.8\linewidth]{../images/tikz-standalone/example-graph}
-\caption{}
-\end{subfigure}%
-\begin{subfigure}[b]{0.6\linewidth}
-\begin{tabular}{lcl}
-\hline
-operation & label &  hash \\
-\hline
-project(ad..) & $\langle 2s\rangle$ &p1 \\
-project(ts, ..) & $\langle 6s\rangle$ & p2\\
-project(y) & $\langle 2s\rangle$ & p3\\
-vectorizer.f\_t & $\langle 40s\rangle$ & vf1 \\
-selector.f\_t & $\langle 60s\rangle$ & s1 \\
-concat & $\langle 10s\rangle$ & c1 \\
-merge & $\langle 0s\rangle$ & m\\
-svm.fit & $\langle 100s\rangle$ & f\\
-\hline
-\end{tabular}
-\caption{}
-\end{subfigure}
-\caption{Experiment graph constructed from the Listing \ref{listing-experiment-graph} (a) and the hash of the operations in the scripts (b)}
-\label{fig-experiment-graph}
-\end{figure}
-Table \ref{fig-experiment-graph}b shows both the label of every edge operation, i.e., time, and the hash of the operations and their hyperparameters.
 
-\begin{lstlisting}[language=Python, caption=Example script,captionpos=b,label = {listing-experiment-graph}]
-import custom_pandas as pd
 
-from custom_sklearn import svm
-from custom_sklearn.feature_selection import SelectKBest
-from custom_sklearn.feature_extraction.text import CountVectorizer
 
-train = pd.read_csv('../input/train.csv') 
-print train.columns # [ad_desc,ts,u_id,price,y]
-vectorizer = CountVectorizer()
-count_vectorized = vectorizer.fit_transform(train['ad_desc'])
-selector =  SelectKBest(k=2)
-top_features = selector.fit_transform(
-                                  train[['ts','u_id','price']],  
-                                  train['y'])
-top_features # print the content of the data frame			     
-X = pd.concat([count_vectorized,top_features], axis = 1)
-model = svm.SVC().fit(X, train['y'])
-model.get() # terminal vertex
-\end{lstlisting}
 
 We start with an empty Experiment Graph.
 After the execution of the script and updating the Experiment Graph, all the artifacts (vertices) have a frequency of 1.
@@ -126,12 +128,6 @@ If the experiment graph is empty, then the execution planner users local executi
 After the execution, an updater component updates the experiment graph to include the vertices and edges of the workload DAG (Step 5).
 Lastly, a materializer component decides what vertices to materialize, i.e., store their underlying data in the vertex of the graph (Step 6).
 
-\begin{figure}
-\centering
-\includegraphics[width=0.7\columnwidth]{../images/system-workflow}
-\caption{System overview of the collaborative workload optimizer}
-\label{system-workflow}
-\end{figure}
 
 \subsection{Improved Use Case}
 In this section, we show how our collaborative workload optimizer improves the workload execution process of the Kaggle use case we described in Section \ref{sec-background}.
