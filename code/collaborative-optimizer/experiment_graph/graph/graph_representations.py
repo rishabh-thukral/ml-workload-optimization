@@ -98,8 +98,10 @@ class BaseGraph(object):
             ax.scatter(None, None, color=color_map[label], label=label)
 
         # TODO there's a problem with nodelist=...., the node type and legends dont match
-        materialized_nodes = [n[0] for n in self.graph.node(data='mat') if n[1]]
-        all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if n[1]['mat']]
+        # materialized_nodes = [n[0] for n in self.graph.node(data='mat') if n[1]]
+        materialized_nodes = [n[0] for n in self.graph.nodes(data='mat') if n[1]]
+        # all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if n[1]['mat']]
+        all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if 'mat' in n[1]]
         nx.draw_networkx(
             self.graph,
             node_size=vertex_size,
@@ -113,8 +115,10 @@ class BaseGraph(object):
             with_labels=False,
             ax=ax)
 
-        non_materialized_nodes = [n[0] for n in self.graph.node(data='mat') if not n[1]]
-        all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if not n[1]['mat']]
+        # non_materialized_nodes = [n[0] for n in self.graph.node(data='mat') if not n[1]]
+        non_materialized_nodes = [n[0] for n in self.graph.nodes(data='mat') if not n[1]]
+        # all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if not n[1]['mat']]
+        all_colors = [color_map[n[1]['type']] for n in self.graph.nodes(data=True) if 'mat' not in n[1]]
         nx.draw_networkx(
             self.graph,
             edgelist=[],

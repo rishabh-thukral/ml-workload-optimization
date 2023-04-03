@@ -224,3 +224,6 @@ class ExecutionEnvironment(object):
                                       'extra_params': 'empty_node',
                                       'size': None})
         return nextnode
+
+    def test_function(self):
+        print("Test Call!")

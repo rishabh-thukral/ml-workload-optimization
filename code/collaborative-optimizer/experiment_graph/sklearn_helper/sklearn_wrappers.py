@@ -39,6 +39,9 @@ class PredictiveModel:
     def predict_proba(self, test, custom_args=None):
         return self.trained_node.predict_proba(test, custom_args)
 
+    def predict(self, test, custom_args=None):
+        return self.trained_node.predict(test, custom_args)
+
     def score(self, test, true_labels, score_type='accuracy', custom_args=None):
         return self.trained_node.score(test, true_labels, score_type=score_type, custom_args=custom_args)
 

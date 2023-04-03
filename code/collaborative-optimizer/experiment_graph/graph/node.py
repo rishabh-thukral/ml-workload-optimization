@@ -7,7 +7,7 @@ from typing import List
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, r2_score
 
 # from experiment_graph.execution_environment import ExecutionEnvironment
 from experiment_graph.benchmark_helper import BenchmarkMetrics
@@ -1558,6 +1558,12 @@ class SuperNode(Node):
             else:
                 predictions = model.predict_proba(test, **custom_args)[:, 1]
             score = roc_auc_score(true_labels, predictions)
+        elif score_type == 'r2':
+            if custom_args is None:
+                predictions = model.predict(test)
+            else:
+                predictions = model.predict(test, **custom_args)
+            score = r2_score(true_labels, predictions)
         else:
             raise Exception('Score type \'{}\' is not supported'.format(score_type))
 
@@ -1586,9 +1592,14 @@ class SuperNode(Node):
         # Since both node 0 and 1 are already stored in the
         # TODO: This only works for adding one column at a time
         c_names = copy.copy(self.nodes[0].get_column())
-        c_names.append(col_names)
+        # c_names.append(col_names)
+        if isinstance(c_names, np.ndarray):
+            c_names = np.append(c_names, col_names)
+        else:
+            c_names.append(col_names)
         c_hash = copy.copy(self.nodes[0].get_column_hash())
         c_hash.append(copy.copy(self.nodes[1].get_column_hash()))
+        # c_hash = np.append(c_hash, copy.copy(self.nodes[1].get_column_hash()))
         data = pd.concat([self.nodes[0].get_materialized_data(), self.nodes[1].get_materialized_data()], axis=1)
         data.columns = c_names
         # self.execution_environment.data_storage.store_dataset(c_hash, data)

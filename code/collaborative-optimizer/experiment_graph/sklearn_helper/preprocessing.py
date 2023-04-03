@@ -14,7 +14,8 @@ class PolynomialFeatures(SimpleModel):
         SimpleModel.__init__(self, preprocessing.PolynomialFeatures(**args))
 
     def get_feature_names(self, input_features):
-        return self.trained_node.data().get_feature_names(input_features=input_features)
+        # return self.trained_node.data().get_feature_names(input_features=input_features)
+        return self.trained_node.data().get_feature_names_out(input_features=input_features)
 
 
 class LabelEncoder(SimpleModel):
