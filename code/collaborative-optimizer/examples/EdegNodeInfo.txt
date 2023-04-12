@@ -1,0 +1,29 @@
+Edges->
+	name: string -> opertion
+	oper: string -> python function
+	executed: boolean
+	execution_time: double
+	freq: int -> number of times this edge is added again in flow
+	args: dict -> input args if any
+	hash: string -> edge operation based description
+	random_state: SKMODEL
+	no_random_state_model: SKMODEL
+	should_warmstart: boolean
+	warm_startable: booelan
+
+Nodes->
+	root: boolean
+	type: string // 7 types: Dataset, Agg, Feature, SK_Model, SuperNode, GroupBy, Evaluation
+	loc: string // for root dataset type of nodes only
+	score: double // for SK_Model type of nodes only
+	involved_nodes: list // for supernodes type of nodes only
+	extra_params: dict{} // for root dataset type of nodes only
+	size: double
+	data: Node
+		id: string
+		computed: boolean
+		access_freq: int
+		size: double
+		execution_environment: ExecutionEnvironment
+		underlying_data: pandas object
+		_unmaterializable: boolean
